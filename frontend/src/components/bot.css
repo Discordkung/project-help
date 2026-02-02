@@ -1,0 +1,230 @@
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Roboto+Mono&display=swap');
+
+:root {
+    /* ธีม: ขาว-แดง-ดำ */
+    --bg-dark: #f5f5f5;              
+    --container-bg: #ffffff;         
+    --theme-red: #e53935;            /* สีแดงหลัก */
+    --theme-black: #111111;          /* สีดำ */
+    --text-glow: 0 0 10px rgba(0,0,0,0.15);
+    --box-glow-red: 0 0 15px rgba(229, 57, 53, 0.35);
+    --box-glow-dark: 0 0 15px rgba(0, 0, 0, 0.25);
+}
+
+/* Container หลักของ Chat */
+.chat-container {
+    width: 450px;
+    height: 600px;
+    margin: 50px auto;
+    background-color: var(--container-bg);
+    border: 1px solid var(--theme-red);
+    border-radius: 12px;
+    box-shadow: var(--box-glow-red);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    font-family: 'Roboto Mono', monospace;
+}
+
+/* ส่วนหัว */
+.chat-header {
+    background: linear-gradient(90deg, #111111, #b71c1c);
+    padding: 15px;
+    text-align: center;
+    border-bottom: none;
+    flex-shrink: 0;
+}
+
+.chat-header h2 {
+    font-family: 'Orbitron', sans-serif;
+    margin: 0;
+    color: #ffffff;
+    text-shadow: var(--text-glow);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    font-size: 1.5rem;
+}
+
+.status-dot {
+    width: 10px;
+    height: 10px;
+    background-color: #ff5252;
+    border-radius: 50%;
+    box-shadow: 0 0 10px #ff5252;
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse { 0% { opacity: 0.5; } 50% { opacity: 1; } 100% { opacity: 0.5; } }
+
+/* พื้นที่ Chat Box */
+.chat-box {
+    flex: 1;
+    padding: 20px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    background-color: #ffffff;
+    background-image:
+        linear-gradient(rgba(229, 57, 53, 0.05) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0, 0, 0, 0.04) 1px, transparent 1px);
+    background-size: 30px 30px;
+}
+
+.chat-box::-webkit-scrollbar { width: 5px; }
+.chat-box::-webkit-scrollbar-thumb { background: var(--theme-red); border-radius: 10px; }
+
+/* แถวข้อความ */
+.message-row {
+    display: flex;
+    align-items: flex-end;
+    gap: 10px;
+}
+
+.bot-row { align-self: flex-start; }
+.user-row { align-self: flex-end; flex-direction: row-reverse; }
+
+/* Avatar */
+.avatar {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    border: 2px solid;
+    padding: 2px;
+    object-fit: contain;
+    background: #ffffff;
+}
+
+.bot-row .avatar { border-color: var(--theme-red); box-shadow: var(--box-glow-red); }
+.user-row .avatar { border-color: var(--theme-black); box-shadow: var(--box-glow-dark); }
+
+/* กล่องข้อความ */
+.message-bubble {
+    padding: 12px 18px;
+    border-radius: 15px;
+    max-width: 70%;
+    font-size: 14px;
+    line-height: 1.5;
+    position: relative;
+    border: 1px solid;
+    word-wrap: break-word;
+}
+
+.bot-bubble {
+    background: #fafafa;
+    color: #111111;
+    border-color: #b0bec5;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+    border-bottom-left-radius: 2px;
+}
+
+.user-bubble {
+    background: #ffebee;
+    color: #b71c1c;
+    border-color: var(--theme-red);
+    box-shadow: 0 2px 8px rgba(183, 28, 28, 0.25);
+    border-bottom-right-radius: 2px;
+    text-align: right;
+}
+
+/* รูปในแชท */
+.chat-uploaded-image {
+    max-width: 100%;
+    border-radius: 8px;
+    margin-top: 8px;
+    display: block;
+    border: 1px solid #ddd;
+}
+
+/* พื้นที่ Input */
+.chat-input-area {
+    position: relative;
+    padding: 12px 15px;
+    background: #ffffff;
+    display: flex;
+    align-items: center;
+    border-top: 1px solid #e0e0e0;
+    gap: 10px;
+    flex-shrink: 0;
+}
+
+/* กล่อง Preview รูปก่อนส่ง (เด้งขึ้นมา) */
+.image-preview-container {
+    position: absolute;
+    bottom: 70px;
+    left: 15px;
+    background: #ffffff;
+    padding: 8px;
+    border-radius: 10px;
+    border: 1px solid var(--theme-red);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.18);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    z-index: 100;
+}
+
+.image-preview-container img {
+    max-height: 80px;
+    border-radius: 5px;
+}
+
+.remove-img-btn {
+    background: #ff4444;
+    color: white;
+    border: none;
+    border-radius: 50%;
+    width: 24px;
+    height: 24px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Input Text */
+input[type="text"] {
+    flex: 1;
+    padding: 10px 12px;
+    background: #fafafa;
+    border: 1px solid #cfd8dc;
+    color: #111111;
+    border-radius: 6px;
+    outline: none;
+    font-family: 'Roboto Mono', monospace;
+}
+
+input[type="text"]:focus {
+    border-color: var(--theme-red);
+}
+
+/* ปุ่มกล้องและปุ่มส่ง (ดีไซน์สี่เหลี่ยม + ไอคอน) */
+.icon-btn, .send-btn {
+    width: 40px; 
+    height: 40px;
+    padding: 0;
+    background: #ffffff;
+    border: 1px solid var(--theme-red);
+    color: var(--theme-red);
+    border-radius: 8px;
+    cursor: pointer;
+    transition: 0.25s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.btn-icon {
+    width: 18px;
+    height: 18px;
+    display: block;
+}
+
+.icon-btn:hover, .send-btn:hover {
+    background: var(--theme-red);
+    color: #ffffff;
+    box-shadow: var(--box-glow-red);
+}
