@@ -19,15 +19,31 @@ const IconSend = (props) => (
     </svg>
 );
 
+const INITIAL_BOT_MESSAGE = {
+    type: 'bot',
+    text: 'ระบบพร้อมใช้งาน... ส่งรูปภาพให้ช่วยดู หรือพิมพ์คุยได้เลยครับ',
+    isInitial: true
+};
+
+const createConversation = (index) => ({
+    id: `conv-${Date.now()}-${index}`,
+    title: `บทสนทนา ${index}`,
+    messages: [INITIAL_BOT_MESSAGE]
+});
+
 const Bot = () => {
-    // State สำหรับเก็บข้อความ
-    const [messages, setMessages] = useState([
-        { 
-            type: 'bot', 
-            text: 'ระบบพร้อมใช้งาน... ส่งรูปภาพให้ช่วยดู หรือพิมพ์คุยได้เลยครับ',
-            isInitial: true 
-        }
-    ]);
+    // State สำหรับเก็บหลายบทสนทนา
+    const [chatState, setChatState] = useState(() => {
+        const firstConv = createConversation(1);
+        return {
+            conversations: [firstConv],
+            activeId: firstConv.id
+        };
+    });
+
+    const { conversations, activeId } = chatState;
+    const activeConversation = conversations.find((c) => c.id === activeId) || conversations[0];
+    const messages = activeConversation ? activeConversation.messages : [];
     
     // State สำหรับ Input
     const [inputValue, setInputValue] = useState('');
@@ -72,6 +88,30 @@ const Bot = () => {
         setImageData(null);
     };
 
+    // ฟังก์ชันสร้างบทสนทนาใหม่
+    const handleNewConversation = () => {
+        setChatState((prev) => {
+            const nextIndex = prev.conversations.length + 1;
+            const newConv = createConversation(nextIndex);
+            return {
+                conversations: [...prev.conversations, newConv],
+                activeId: newConv.id
+            };
+        });
+        setInputValue('');
+        removeImage();
+    };
+
+    // ฟังก์ชันเลือกบทสนทนาจาก sidebar
+    const handleSelectConversation = (id) => {
+        setChatState((prev) => ({
+            ...prev,
+            activeId: id
+        }));
+        setInputValue('');
+        removeImage();
+    };
+
     // ฟังก์ชันส่งข้อความ
     const handleSendMessage = async () => {
         if (!inputValue.trim() && !imageData) return;
@@ -83,7 +123,14 @@ const Bot = () => {
             image: previewImage // ถ้ามีรูป ก็แสดงรูปด้วย
         };
 
-        setMessages(prev => [...prev, newUserMessage]);
+        setChatState((prev) => {
+            const updatedConversations = prev.conversations.map((conv) =>
+                conv.id === prev.activeId
+                    ? { ...conv, messages: [...conv.messages, newUserMessage] }
+                    : conv
+            );
+            return { ...prev, conversations: updatedConversations };
+        });
         
         // 2. เก็บค่าไว้ส่ง API และเคลียร์ Input ทันที
         const payload = {
@@ -104,95 +151,165 @@ const Bot = () => {
             
             const data = await response.json();
             
-            // 4. เพิ่มข้อความตอบกลับจาก Bot
+            // 4. เพิ่มข้อความตอบกลับจาก Bot ลงในบทสนทนาปัจจุบัน
             const botReply = {
                 type: 'bot',
                 text: data.reply || 'เกิดข้อผิดพลาดในการรับข้อมูล'
             };
-            setMessages(prev => [...prev, botReply]);
+
+            setChatState((prev) => {
+                const updatedConversations = prev.conversations.map((conv) =>
+                    conv.id === prev.activeId
+                        ? { ...conv, messages: [...conv.messages, botReply] }
+                        : conv
+                );
+                return { ...prev, conversations: updatedConversations };
+            });
 
         } catch (error) {
             console.error("Fetch Error:", error);
-            setMessages(prev => [...prev, { type: 'bot', text: 'ระบบขัดข้อง: กรุณาตรวจสอบการรัน Server' }]);
+            setChatState((prev) => {
+                const fallbackMessage = {
+                    type: 'bot',
+                    text: 'ระบบขัดข้อง: กรุณาตรวจสอบการรัน Server'
+                };
+                const updatedConversations = prev.conversations.map((conv) =>
+                    conv.id === prev.activeId
+                        ? { ...conv, messages: [...conv.messages, fallbackMessage] }
+                        : conv
+                );
+                return { ...prev, conversations: updatedConversations };
+            });
         }
     };
 
+    // sidebar เปิด-ปิด
+    const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+
     return (
-        <div className="chat-container">
-            <div className="chat-header">
-                <h2>LIONBOT <span className="status-dot"></span></h2>
-            </div>
-            
-            <div className="chat-box" ref={chatBoxRef}>
-                {messages.map((msg, index) => (
-                    <div key={index} className={`message-row ${msg.type}-row`}>
-                        {/* Avatar */}
-                        {msg.type === 'bot' && (
-                             <img src="https://cdn-icons-png.flaticon.com/512/394/394845.png" alt="Bot" className="avatar" />
-                        )}
-                        {msg.type === 'user' && (
-                             <img src="https://cdn-icons-png.flaticon.com/512/1077/1077114.png" alt="User" className="avatar" />
-                        )}
-
-                        <div className={`message-bubble ${msg.type}-bubble`}>
-                            {msg.text}
-                            {msg.image && <img src={msg.image} alt="uploaded" className="chat-uploaded-image" />}
-                        </div>
-                    </div>
-                ))}
-            </div>
-
-            <div className="chat-input-area">
-                {/* กล่อง Preview รูปภาพที่เด้งขึ้นมา */}
-                {previewImage && (
-                    <div className="image-preview-container">
-                        <img src={previewImage} alt="Preview" />
-                        <button onClick={removeImage} className="remove-img-btn">
-                            <i className="fas fa-times"></i>
+        <div className="chat-shell">
+            {isSidebarOpen && (
+                <aside className="chat-sidebar">
+                    <div className="chat-sidebar-header">
+                        <span>ประวัติสนทนา</span>
+                        <button
+                            className="sidebar-close-btn"
+                            type="button"
+                            onClick={() => setIsSidebarOpen(false)}
+                            aria-label="ซ่อนประวัติสนทนา"
+                        >
+                            ×
                         </button>
                     </div>
-                )}
-                
-                {/* ปุ่มอัปโหลดรูป (ซ่อน Input จริงไว้) */}
-                <input 
-                    type="file" 
-                    id="image-input" 
-                    accept="image/*"
-                    ref={fileInputRef}
-                    onChange={handleFileChange} 
-                    style={{ display: 'none' }} 
-                />
-                
-                {/* ปุ่มกล้องถ่ายรูป */}
-                <button
-                    className="icon-btn"
-                    type="button"
-                    onClick={() => fileInputRef.current?.click()}
-                    aria-label="อัปโหลดรูปภาพ"
-                    title="อัปโหลดรูปภาพ"
-                >
-                    <IconCamera className="btn-icon" />
-                </button>
+                    <button
+                        className="new-chat-btn"
+                        type="button"
+                        onClick={handleNewConversation}
+                    >
+                        + บทสนทนาใหม่
+                    </button>
+                    <div className="conversation-list">
+                        {conversations.map((conv, index) => (
+                            <button
+                                key={conv.id}
+                                type="button"
+                                className={`conversation-item ${conv.id === activeId ? 'active' : ''}`}
+                                onClick={() => handleSelectConversation(conv.id)}
+                            >
+                                <span className="conversation-title">{conv.title}</span>
+                                <span className="conversation-subtitle">
+                                    {conv.messages[0]?.text?.slice(0, 22) || `เริ่มต้น #${index + 1}`}
+                                </span>
+                            </button>
+                        ))}
+                    </div>
+                </aside>
+            )}
 
-                {/* ช่องพิมพ์ข้อความ */}
-                <input 
-                    type="text" 
-                    value={inputValue} 
-                    onChange={(e) => setInputValue(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
-                    placeholder="พิมพ์ข้อความ... (Enter เพื่อส่ง)" 
-                />
+            <div className="chat-container">
+                <div className="chat-header">
+                    <button
+                        className="sidebar-toggle-btn"
+                        type="button"
+                        onClick={() => setIsSidebarOpen((open) => !open)}
+                        aria-label={isSidebarOpen ? 'ซ่อนประวัติสนทนา' : 'แสดงประวัติสนทนา'}
+                    >
+                        ☰
+                    </button>
+                    <h2>LIONBOT <span className="status-dot"></span></h2>
+                </div>
                 
-                {/* ปุ่มส่งข้อความ */}
-                <button
-                    onClick={handleSendMessage}
-                    className="send-btn"
-                    type="button"
-                    aria-label="ส่งข้อความ"
-                    title="ส่งข้อความ"
-                >
-                    <IconSend className="btn-icon" />
-                </button>
+                <div className="chat-box" ref={chatBoxRef}>
+                    {messages.map((msg, index) => (
+                        <div key={index} className={`message-row ${msg.type}-row`}>
+                            {/* Avatar */}
+                            {msg.type === 'bot' && (
+                                 <img src="https://cdn-icons-png.flaticon.com/512/394/394845.png" alt="Bot" className="avatar" />
+                            )}
+                            {msg.type === 'user' && (
+                                 <img src="https://cdn-icons-png.flaticon.com/512/1077/1077114.png" alt="User" className="avatar" />
+                            )}
+
+                            <div className={`message-bubble ${msg.type}-bubble`}>
+                                {msg.text}
+                                {msg.image && <img src={msg.image} alt="uploaded" className="chat-uploaded-image" />}
+                            </div>
+                        </div>
+                    ))}
+                </div>
+
+                <div className="chat-input-area">
+                    {/* กล่อง Preview รูปภาพที่เด้งขึ้นมา */}
+                    {previewImage && (
+                        <div className="image-preview-container">
+                            <img src={previewImage} alt="Preview" />
+                            <button onClick={removeImage} className="remove-img-btn">
+                                ×
+                            </button>
+                        </div>
+                    )}
+                    
+                    {/* ปุ่มอัปโหลดรูป (ซ่อน Input จริงไว้) */}
+                    <input 
+                        type="file" 
+                        id="image-input" 
+                        accept="image/*"
+                        ref={fileInputRef}
+                        onChange={handleFileChange} 
+                        style={{ display: 'none' }} 
+                    />
+                    
+                    {/* ปุ่มกล้องถ่ายรูป */}
+                    <button
+                        className="icon-btn"
+                        type="button"
+                        onClick={() => fileInputRef.current?.click()}
+                        aria-label="อัปโหลดรูปภาพ"
+                        title="อัปโหลดรูปภาพ"
+                    >
+                        <IconCamera className="btn-icon" />
+                    </button>
+
+                    {/* ช่องพิมพ์ข้อความ */}
+                    <input 
+                        type="text" 
+                        value={inputValue} 
+                        onChange={(e) => setInputValue(e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
+                        placeholder="พิมพ์ข้อความ... (Enter เพื่อส่ง)" 
+                    />
+                    
+                    {/* ปุ่มส่งข้อความ */}
+                    <button
+                        onClick={handleSendMessage}
+                        className="send-btn"
+                        type="button"
+                        aria-label="ส่งข้อความ"
+                        title="ส่งข้อความ"
+                    >
+                        <IconSend className="btn-icon" />
+                    </button>
+                </div>
             </div>
         </div>
     );
