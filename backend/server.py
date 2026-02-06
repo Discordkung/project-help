@@ -13,7 +13,7 @@ CORS(app)
 # --- [CONFIG] ---
 GOOGLE_API_KEY = "AIzaSyBvBp3mvo_G07M_Yh4ZW7RKjPpPwu-N688"
 # แนะนำใช้ 'gemini-1.5-flash' หรือ 'gemini-2.0-flash-exp' (ถ้ามีสิทธิ์) เพื่อรองรับ PDF/Docs ได้ดี
-SELECTED_MODEL = "gemini-1.5-flash" 
+SELECTED_MODEL = "gemini-2.5-flash" 
 
 BOT_PERSONA = """
 คุณคือ "LIONBOT" ผู้ช่วยอัจฉริยะ
@@ -111,5 +111,5 @@ def chat():
         return jsonify({"reply": "เกิดข้อผิดพลาดภายในเซิร์ฟเวอร์"}), 500
 
 if __name__ == '__main__':
-    print("🚀 LIONBOT Server is running on port 3000...")
-    app.run(port=3000, debug=True)
+    print("🚀 LIONBOT Server is running on port 5000...")
+    app.run(port=5000, debug=True)
