@@ -1,7 +1,10 @@
 import React, { useState, useRef, useEffect } from 'react';
 import './bot.css';
 
-// SVG Icons (ใช้ SVG ตรงๆ เพื่อไม่ต้องลง Library เพิ่ม)
+// --- นำเข้ารูปภาพสิงโต (ต้องมีไฟล์ lion-avatar.png ในโฟลเดอร์เดียวกัน) ---
+import botLogo from './lion-avatar.png'; 
+
+// SVG Icons
 const IconAttachment = () => (
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path></svg>
 );
@@ -12,7 +15,7 @@ const IconFileGeneric = () => (
     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
 );
 
-// แปลงข้อความธรรมดาที่มี * และ ** แบบง่าย ๆ ให้เป็น JSX ใกล้เคียง Gemini
+// แปลงข้อความธรรมดาที่มี * และ **
 const renderInlineMarkdown = (text) => {
     const parts = text.split(/(\*\*[^*]+\*\*)/g);
     return parts.map((part, index) => {
@@ -92,10 +95,10 @@ const Bot = () => {
     // UI States
     const [inputValue, setInputValue] = useState('');
     const [isSidebarOpen, setIsSidebarOpen] = useState(true);
-    const [isLoading, setIsLoading] = useState(false); // สถานะกำลังพิมพ์...
+    const [isLoading, setIsLoading] = useState(false);
 
-    // File Handling (รองรับหลายไฟล์)
-    const [selectedFiles, setSelectedFiles] = useState([]); // Array ของ { name, type, isImage, previewUrl, base64 }
+    // File Handling
+    const [selectedFiles, setSelectedFiles] = useState([]);
     
     const chatBoxRef = useRef(null);
     const fileInputRef = useRef(null);
@@ -107,7 +110,7 @@ const Bot = () => {
         }
     }, [messages, isLoading, selectedFiles]);
 
-    // จัดการการเลือกไฟล์ (ได้หลายไฟล์)
+    // จัดการการเลือกไฟล์
     const handleFileChange = (e) => {
         const files = Array.from(e.target.files || []);
         if (!files.length) return;
@@ -156,11 +159,10 @@ const Bot = () => {
     const handleSendMessage = async () => {
         if (!inputValue.trim() && selectedFiles.length === 0) return;
 
-        // 1. สร้าง Message ฝั่ง User
         const newUserMessage = { 
             type: 'user',
             text: inputValue,
-            files: selectedFiles // แนบข้อมูลไฟล์หลายไฟล์ไปด้วยเพื่อใช้แสดงผล
+            files: selectedFiles 
         };
 
         setChatState(prev => {
@@ -170,21 +172,18 @@ const Bot = () => {
             return { ...prev, conversations: updated };
         });
 
-        // 2. เตรียม Payload
         const payload = {
             message: inputValue,
             files: selectedFiles.map((f) => ({
                 mimeType: f.type,
-                data: f.base64.split(',')[1] // ตัด header ออก
+                data: f.base64.split(',')[1]
             }))
         };
 
-        // Reset Input & Show Loading
         setInputValue('');
         clearAllFiles();
         setIsLoading(true);
 
-        // 3. ยิง API
         try {
             const response = await fetch('http://localhost:5000/api/chat', {
                 method: 'POST',
@@ -216,11 +215,10 @@ const Bot = () => {
                 return { ...prev, conversations: updated };
             });
         } finally {
-            setIsLoading(false); // ปิด Animation
+            setIsLoading(false);
         }
     };
 
-    // Helper: ดึงนามสกุลไฟล์
     const getFileExt = (mimeType) => {
         if (!mimeType) return 'FILE';
         if (mimeType.includes('pdf')) return 'PDF';
@@ -243,8 +241,7 @@ const Bot = () => {
                             <button
                                 key={conv.id}
                                 className={`conversation-item ${conv.id === activeId ? 'active' : ''}`}
-                                onClick={() => {  setChatState(prev => ({...prev, activeId: conv.id}));  clearAllFiles(); // ใช้ชื่อฟังก์ชันนี้ครับ
-}}
+                                onClick={() => { setChatState(prev => ({...prev, activeId: conv.id})); clearAllFiles(); }}
                             >
                                 <span className="conversation-title">{conv.title}</span>
                                 <span className="conversation-subtitle">{conv.messages[conv.messages.length-1]?.text?.slice(0,25) || '...'}</span>
@@ -264,16 +261,15 @@ const Bot = () => {
                     {messages.map((msg, index) => (
                         <div key={index} className={`message-row ${msg.type}-row`}>
                             {msg.type === 'bot' && (
-                                <img src="https://cdn-icons-png.flaticon.com/512/4712/4712027.png" alt="Bot" className="avatar" />
+                                /* --- แก้ไขตรงนี้: ใช้ตัวแปร botLogo แทนลิงก์ --- */
+                                <img src={botLogo} alt="LIONBOT" className="avatar" />
                             )}
                             
                             <div className={`message-bubble ${msg.type}-bubble`}>
-                                {/* ส่วนแสดงข้อความ (เคารพการขึ้นบรรทัดใหม่) */}
                                 <div className="message-text">
                                     {renderMessageText(msg.text)}
                                 </div>
 
-                                {/* ส่วนแสดงไฟล์แนบในประวัติแชท (รองรับหลายไฟล์) */}
                                 {Array.isArray(msg.files) &&
                                     msg.files.map((f, i) =>
                                         f.isImage ? (
@@ -306,7 +302,8 @@ const Bot = () => {
                     {/* Animation กำลังพิมพ์... */}
                     {isLoading && (
                         <div className="message-row bot-row">
-                             <img src="https://cdn-icons-png.flaticon.com/512/4712/4712027.png" alt="Bot" className="avatar" />
+                             {/* --- แก้ไขตรงนี้: ใช้ตัวแปร botLogo แทนลิงก์ --- */ }
+                             <img src={botLogo} alt="LIONBOT" className="avatar" />
                              <div className="typing-indicator">
                                  <div className="typing-dot"></div>
                                  <div className="typing-dot"></div>
@@ -316,9 +313,8 @@ const Bot = () => {
                     )}
                 </div>
 
-                {/* ส่วน Input Area */}
                 <div className="chat-input-area">
-                    {/* File Preview Popup (เด้งขึ้นมาเมื่อเลือกไฟล์) */}
+                    {/* File Preview Popup */}
                     {selectedFiles.length > 0 && (
                         <div className="preview-popup">
                             <div className="preview-content">
@@ -372,7 +368,6 @@ const Bot = () => {
                         onChange={handleFileChange} 
                         style={{display:'none'}}
                         multiple
-                        // รับไฟล์ได้หลายประเภท รวมถึง Word / Excel
                         accept="image/*, application/pdf, .doc, .docx, .xls, .xlsx, .txt"
                     />
                     
