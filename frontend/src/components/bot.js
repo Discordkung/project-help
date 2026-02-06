@@ -12,6 +12,60 @@ const IconFileGeneric = () => (
     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
 );
 
+// แปลงข้อความธรรมดาที่มี * และ ** แบบง่าย ๆ ให้เป็น JSX ใกล้เคียง Gemini
+const renderInlineMarkdown = (text) => {
+    const parts = text.split(/(\*\*[^*]+\*\*)/g);
+    return parts.map((part, index) => {
+        const boldMatch = part.match(/^\*\*(.+)\*\*$/);
+        if (boldMatch) {
+            return <strong key={`b-${index}`}>{boldMatch[1]}</strong>;
+        }
+        return <span key={`t-${index}`}>{part}</span>;
+    });
+};
+
+const renderMessageText = (text) => {
+    if (!text) return null;
+
+    const lines = text.split('\n');
+    const blocks = [];
+    let listBuffer = [];
+
+    const flushList = (key) => {
+        if (listBuffer.length === 0) return;
+        blocks.push(
+            <ul className="msg-list" key={`ul-${key}`}>
+                {listBuffer.map((item, i) => (
+                    <li key={`li-${key}-${i}`}>{item}</li>
+                ))}
+            </ul>
+        );
+        listBuffer = [];
+    };
+
+    lines.forEach((raw, idx) => {
+        const line = raw.trimEnd();
+        const bulletMatch = line.trim().match(/^[-*]\s+(.*)/);
+
+        if (bulletMatch) {
+            const content = bulletMatch[1];
+            listBuffer.push(renderInlineMarkdown(content));
+        } else if (line.trim() === '') {
+            flushList(idx);
+        } else {
+            flushList(idx);
+            blocks.push(
+                <p className="msg-paragraph" key={`p-${idx}`}>
+                    {renderInlineMarkdown(line)}
+                </p>
+            );
+        }
+    });
+
+    flushList('last');
+    return blocks;
+};
+
 const INITIAL_BOT_MESSAGE = {
     type: 'bot',
     text: 'สวัสดีครับ ผม LIONBOT 🦁\nมีอะไรให้ช่วย หรือต้องการให้วิเคราะห์เอกสาร/รูปภาพ ส่งมาได้เลยครับ',
@@ -40,8 +94,8 @@ const Bot = () => {
     const [isSidebarOpen, setIsSidebarOpen] = useState(true);
     const [isLoading, setIsLoading] = useState(false); // สถานะกำลังพิมพ์...
 
-    // File Handling
-    const [selectedFile, setSelectedFile] = useState(null); // เก็บ Object ไฟล์ { name, type, data, previewUrl }
+    // File Handling (รองรับหลายไฟล์)
+    const [selectedFiles, setSelectedFiles] = useState([]); // Array ของ { name, type, isImage, previewUrl, base64 }
     
     const chatBoxRef = useRef(null);
     const fileInputRef = useRef(null);
@@ -51,32 +105,42 @@ const Bot = () => {
         if (chatBoxRef.current) {
             chatBoxRef.current.scrollTop = chatBoxRef.current.scrollHeight;
         }
-    }, [messages, isLoading, selectedFile]);
+    }, [messages, isLoading, selectedFiles]);
 
-    // จัดการการเลือกไฟล์
+    // จัดการการเลือกไฟล์ (ได้หลายไฟล์)
     const handleFileChange = (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
+        const files = Array.from(e.target.files || []);
+        if (!files.length) return;
 
-        const reader = new FileReader();
-        reader.onload = (event) => {
-            const base64String = event.target.result;
-            const isImage = file.type.startsWith('image/');
-            
-            setSelectedFile({
-                fileObj: file,
-                name: file.name,
-                type: file.type,
-                isImage: isImage,
-                previewUrl: isImage ? base64String : null, // ถ้าไม่ใช่รูป ไม่ต้องสร้าง URL Preview ใหญ่
-                base64: base64String // เก็บไว้ส่ง API
-            });
-        };
-        reader.readAsDataURL(file); // อ่านเป็น Base64 ทั้งรูปและเอกสาร เพื่อส่งให้ Gemini
+        files.forEach((file) => {
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                const base64String = event.target.result;
+                const isImage = file.type.startsWith('image/');
+
+                setSelectedFiles((prev) => [
+                    ...prev,
+                    {
+                        fileObj: file,
+                        name: file.name,
+                        type: file.type,
+                        isImage,
+                        previewUrl: isImage ? base64String : null,
+                        base64: base64String
+                    }
+                ]);
+            };
+            reader.readAsDataURL(file);
+        });
+
         e.target.value = '';
     };
 
-    const removeFile = () => setSelectedFile(null);
+    const removeFileAt = (index) => {
+        setSelectedFiles((prev) => prev.filter((_, i) => i !== index));
+    };
+
+    const clearAllFiles = () => setSelectedFiles([]);
 
     // สร้าง Chat ใหม่
     const handleNewConversation = () => {
@@ -85,18 +149,18 @@ const Bot = () => {
             return { conversations: [...prev.conversations, newConv], activeId: newConv.id };
         });
         setInputValue('');
-        removeFile();
+        clearAllFiles();
     };
 
     // ส่งข้อความ
     const handleSendMessage = async () => {
-        if (!inputValue.trim() && !selectedFile) return;
+        if (!inputValue.trim() && selectedFiles.length === 0) return;
 
         // 1. สร้าง Message ฝั่ง User
         const newUserMessage = { 
-            type: 'user', 
-            text: inputValue, 
-            file: selectedFile // แนบข้อมูลไฟล์ไปด้วยเพื่อใช้แสดงผล
+            type: 'user',
+            text: inputValue,
+            files: selectedFiles // แนบข้อมูลไฟล์หลายไฟล์ไปด้วยเพื่อใช้แสดงผล
         };
 
         setChatState(prev => {
@@ -109,15 +173,15 @@ const Bot = () => {
         // 2. เตรียม Payload
         const payload = {
             message: inputValue,
-            file: selectedFile ? {
-                mimeType: selectedFile.type,
-                data: selectedFile.base64.split(',')[1] // ตัด header ออก
-            } : null
+            files: selectedFiles.map((f) => ({
+                mimeType: f.type,
+                data: f.base64.split(',')[1] // ตัด header ออก
+            }))
         };
 
         // Reset Input & Show Loading
         setInputValue('');
-        removeFile();
+        clearAllFiles();
         setIsLoading(true);
 
         // 3. ยิง API
@@ -179,7 +243,8 @@ const Bot = () => {
                             <button
                                 key={conv.id}
                                 className={`conversation-item ${conv.id === activeId ? 'active' : ''}`}
-                                onClick={() => { setChatState(prev => ({...prev, activeId: conv.id})); removeFile(); }}
+                                onClick={() => {  setChatState(prev => ({...prev, activeId: conv.id}));  clearAllFiles(); // ใช้ชื่อฟังก์ชันนี้ครับ
+}}
                             >
                                 <span className="conversation-title">{conv.title}</span>
                                 <span className="conversation-subtitle">{conv.messages[conv.messages.length-1]?.text?.slice(0,25) || '...'}</span>
@@ -203,25 +268,37 @@ const Bot = () => {
                             )}
                             
                             <div className={`message-bubble ${msg.type}-bubble`}>
-                                {/* ส่วนแสดงข้อความ */}
-                                <div>{msg.text}</div>
+                                {/* ส่วนแสดงข้อความ (เคารพการขึ้นบรรทัดใหม่) */}
+                                <div className="message-text">
+                                    {renderMessageText(msg.text)}
+                                </div>
 
-                                {/* ส่วนแสดงไฟล์แนบในประวัติแชท */}
-                                {msg.file && (
-                                    msg.file.isImage ? (
-                                        <img src={msg.file.previewUrl || msg.file.base64} alt="attached" className="chat-uploaded-image" />
-                                    ) : (
-                                        <div className="file-attachment">
-                                            <div style={{background: 'rgba(0,0,0,0.1)', padding:'8px', borderRadius:'4px'}}>
-                                                <IconFileGeneric />
+                                {/* ส่วนแสดงไฟล์แนบในประวัติแชท (รองรับหลายไฟล์) */}
+                                {Array.isArray(msg.files) &&
+                                    msg.files.map((f, i) =>
+                                        f.isImage ? (
+                                            <img
+                                                key={`img-${i}`}
+                                                src={f.previewUrl || f.base64}
+                                                alt="attached"
+                                                className="chat-uploaded-image"
+                                            />
+                                        ) : (
+                                            <div className="file-attachment" key={`file-${i}`}>
+                                                <div className="file-attachment-icon">
+                                                    <IconFileGeneric />
+                                                </div>
+                                                <div className="file-attachment-info">
+                                                    <span className="file-attachment-name">
+                                                        {f.name}
+                                                    </span>
+                                                    <span className="file-attachment-meta">
+                                                        {getFileExt(f.type)} Document
+                                                    </span>
+                                                </div>
                                             </div>
-                                            <div style={{display:'flex', flexDirection:'column'}}>
-                                                <span style={{fontWeight:'600', fontSize:'0.85rem'}}>{msg.file.name}</span>
-                                                <span style={{fontSize:'0.7rem', opacity:0.8}}>{getFileExt(msg.file.type)} Document</span>
-                                            </div>
-                                        </div>
-                                    )
-                                )}
+                                        )
+                                    )}
                             </div>
                         </div>
                     ))}
@@ -242,22 +319,50 @@ const Bot = () => {
                 {/* ส่วน Input Area */}
                 <div className="chat-input-area">
                     {/* File Preview Popup (เด้งขึ้นมาเมื่อเลือกไฟล์) */}
-                    {selectedFile && (
+                    {selectedFiles.length > 0 && (
                         <div className="preview-popup">
                             <div className="preview-content">
-                                {selectedFile.isImage ? (
-                                    <img src={selectedFile.previewUrl} alt="Preview" className="preview-thumbnail" />
-                                ) : (
-                                    <div className="preview-file-icon">
-                                        {getFileExt(selectedFile.type)}
+                                {selectedFiles.map((f, index) => (
+                                    <div className="preview-item" key={`pv-${index}`}>
+                                        {f.isImage ? (
+                                            <img
+                                                src={f.previewUrl}
+                                                alt="Preview"
+                                                className="preview-thumbnail"
+                                            />
+                                        ) : (
+                                            <div className="preview-file-icon">
+                                                <div className="preview-file-icon-inner">
+                                                    <IconFileGeneric />
+                                                </div>
+                                                <span className="preview-file-ext">
+                                                    {getFileExt(f.type)}
+                                                </span>
+                                            </div>
+                                        )}
+                                        <div className="preview-info">
+                                            <span className="file-name">{f.name}</span>
+                                            <span className="file-type">
+                                                {f.isImage ? 'Image' : 'Document'}
+                                            </span>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            className="preview-remove-btn"
+                                            onClick={() => removeFileAt(index)}
+                                        >
+                                            ×
+                                        </button>
                                     </div>
-                                )}
-                                <div className="preview-info">
-                                    <span className="file-name">{selectedFile.name}</span>
-                                    <span className="file-type">{selectedFile.isImage ? 'Image' : 'Document'}</span>
-                                </div>
+                                ))}
                             </div>
-                            <button onClick={removeFile} style={{border:'none', background:'transparent', color:'#ff1744', cursor:'pointer', fontSize:'18px'}}>×</button>
+                            <button
+                                type="button"
+                                className="preview-clear-all-btn"
+                                onClick={clearAllFiles}
+                            >
+                                ลบทั้งหมด
+                            </button>
                         </div>
                     )}
 
@@ -266,7 +371,8 @@ const Bot = () => {
                         ref={fileInputRef} 
                         onChange={handleFileChange} 
                         style={{display:'none'}}
-                        // รับไฟล์ได้หลายประเภท
+                        multiple
+                        // รับไฟล์ได้หลายประเภท รวมถึง Word / Excel
                         accept="image/*, application/pdf, .doc, .docx, .xls, .xlsx, .txt"
                     />
                     
@@ -283,7 +389,7 @@ const Bot = () => {
                         disabled={isLoading}
                     />
 
-                    <button className="send-btn" onClick={handleSendMessage} disabled={isLoading || (!inputValue && !selectedFile)}>
+                    <button className="send-btn" onClick={handleSendMessage} disabled={isLoading || (!inputValue && selectedFiles.length === 0)}>
                         <IconSend />
                     </button>
                 </div>

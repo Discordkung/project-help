@@ -12,7 +12,7 @@ CORS(app)
 
 # --- [CONFIG] ---
 GOOGLE_API_KEY = "AIzaSyBvBp3mvo_G07M_Yh4ZW7RKjPpPwu-N688"
-# แนะนำใช้ 'gemini-1.5-flash' หรือ 'gemini-2.0-flash-exp' (ถ้ามีสิทธิ์) เพื่อรองรับ PDF/Docs ได้ดี
+# แนะนำใช้ 'gemini-1.5-flash' หรือ 'gemini-2.0-flash-exp' เพื่อรองรับ PDF/Docs/Images ได้ดี
 SELECTED_MODEL = "gemini-2.5-flash" 
 
 BOT_PERSONA = """
@@ -31,33 +31,40 @@ def chat():
     try:
         body = request.json
         message = body.get('message', '')
-        file_data = body.get('file') # เปลี่ยนรับ key เป็น 'file' เพื่อสื่อความหมายรวม
+        
+        # --- จุดที่แก้ไข: รับค่าเป็น list 'files' เพื่อรองรับหลายไฟล์ ---
+        files_data = body.get('files', [])
+        
+        # Fallback: ถ้ารับ 'files' ไม่เจอ ให้ลองหา 'file' แบบเก่า (กันเหนียว)
+        if not files_data and 'file' in body:
+            files_data = [body.get('file')]
 
         user_parts = []
 
-        # 1. จัดการไฟล์แนบ (PDF, Images, etc.)
-        if file_data:
-            mime_type = file_data.get('mimeType', '')
-            base64_data = file_data.get('data', '')
-
-            # Mapping ชื่อไฟล์ให้ AI เข้าใจ context
-            file_type_label = "ไฟล์แนบ"
-            if "pdf" in mime_type: file_type_label = "เอกสาร PDF"
-            elif "image" in mime_type: file_type_label = "รูปภาพ"
-            elif "csv" in mime_type or "excel" in mime_type or "spreadsheet" in mime_type: file_type_label = "ตารางข้อมูล (Excel/CSV)"
-            
-            # แจ้ง AI ว่ามีไฟล์
+        # 1. วนลูปจัดการไฟล์แนบทั้งหมด
+        if files_data:
+            # แจ้ง AI ก่อนว่ามีการแนบไฟล์
             user_parts.append({
-                "text": f"\n[ระบบ: ผู้ใช้ได้แนบ {file_type_label} มาด้วย โปรดวิเคราะห์ข้อมูลในไฟล์นี้]\n"
+                "text": f"\n[ระบบ: ผู้ใช้ได้แนบไฟล์จำนวน {len(files_data)} ไฟล์ โปรดวิเคราะห์ข้อมูลในไฟล์เหล่านี้ประกอบคำถาม]\n"
             })
 
-            # ส่ง Data
-            user_parts.append({
-                "inline_data": {
-                    "mime_type": mime_type,
-                    "data": base64_data
-                }
-            })
+            for file_data in files_data:
+                mime_type = file_data.get('mimeType', '')
+                base64_data = file_data.get('data', '')
+
+                # Mapping ชื่อไฟล์ให้ AI เข้าใจ context
+                file_type_label = "ไฟล์แนบ"
+                if "pdf" in mime_type: file_type_label = "เอกสาร PDF"
+                elif "image" in mime_type: file_type_label = "รูปภาพ"
+                elif "csv" in mime_type or "excel" in mime_type or "spreadsheet" in mime_type: file_type_label = "ตารางข้อมูล"
+                
+                # ส่ง Data ของแต่ละไฟล์
+                user_parts.append({
+                    "inline_data": {
+                        "mime_type": mime_type,
+                        "data": base64_data
+                    }
+                })
 
         # 2. ใส่ข้อความ
         if message:
@@ -87,7 +94,7 @@ def chat():
         
         if response.status_code != 200:
             print(f"Error: {response.text}")
-            return jsonify({"reply": "ขออภัย ระบบไม่สามารถประมวลผลไฟล์หรือข้อความนี้ได้ในขณะนี้"}), 500
+            return jsonify({"reply": "ขออภัย ระบบไม่สามารถประมวลผลไฟล์หรือข้อความนี้ได้ในขณะนี้ (API Error)"}), 500
 
         data = response.json()
         
@@ -98,7 +105,7 @@ def chat():
             # เพิ่มคำตอบ Bot ลง Memory
             conversation_history = updated_history + [{"role": "model", "parts": content['parts']}]
             
-            # Keep history short (prevent token overflow)
+            # Keep history short (prevent token overflow) - เก็บ 15 ข้อความล่าสุด
             if len(conversation_history) > 15:
                 conversation_history = conversation_history[-15:]
 
@@ -108,7 +115,7 @@ def chat():
 
     except Exception as e:
         print(f"Server Exception: {e}")
-        return jsonify({"reply": "เกิดข้อผิดพลาดภายในเซิร์ฟเวอร์"}), 500
+        return jsonify({"reply": f"เกิดข้อผิดพลาดภายในเซิร์ฟเวอร์: {str(e)}"}), 500
 
 if __name__ == '__main__':
     print("🚀 LIONBOT Server is running on port 5000...")
