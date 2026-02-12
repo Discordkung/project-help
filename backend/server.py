@@ -17,7 +17,7 @@ app.config['MAX_CONTENT_LENGTH'] = 20 * 1024 * 1024  # 20MB
 CORS(app)
 
 # --- [CONFIG] ---
-GOOGLE_API_KEY = "AIzaSyDPzywXumWvUafiXupkBeSJQgGu84E3VGU" # เช็ค Key ว่าถูกต้อง
+GOOGLE_API_KEY = "" # เช็ค Key ว่าถูกต้อง
 SELECTED_MODEL = "gemini-2.5-flash"  # แก้เป็นรุ่นที่มีจริง (หรือใช้ gemini-1.5-flash)
 
 BOT_PERSONA = """
