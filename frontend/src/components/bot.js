@@ -1,19 +1,72 @@
 import React, { useState, useRef, useEffect } from 'react';
 import './bot.css';
 
-// --- นำเข้ารูปภาพสิงโต (ต้องมีไฟล์ lion-avatar.png ในโฟลเดอร์เดียวกัน) ---
+// --- นำเข้ารูปภาพสิงโต ---
 import botLogo from './lion-avatar.png'; 
 
-// SVG Icons
+// --- SVG Icons (เพิ่มชุดไอคอนใหม่) ---
 const IconAttachment = () => (
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path></svg>
 );
 const IconSend = () => (
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
 );
+
+// ไอคอน Word (ตัว W)
+const IconWord = () => (
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+        <polyline points="14 2 14 8 20 8"></polyline>
+        <line x1="16" y1="13" x2="8" y2="13"></line>
+        <line x1="16" y1="17" x2="8" y2="17"></line>
+        <line x1="10" y1="9" x2="8" y2="9"></line>
+    </svg>
+);
+
+// ไอคอน Excel (ตาราง)
+const IconExcel = () => (
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+        <polyline points="14 2 14 8 20 8"></polyline>
+        <rect x="8" y="13" width="8" height="4"></rect>
+        <line x1="8" y1="13" x2="16" y2="17"></line>
+        <line x1="8" y1="17" x2="16" y2="13"></line>
+    </svg>
+);
+
+// ไอคอน PDF (กระดาษมีพับ)
+const IconPDF = () => (
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+        <polyline points="14 2 14 8 20 8"></polyline>
+        <path d="M12 18v-6h2.5c.8 0 1.5.7 1.5 1.5S15.3 15 14.5 15H12"></path>
+    </svg>
+);
+
+// ไอคอนไฟล์ทั่วไป
 const IconFileGeneric = () => (
     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
 );
+
+// ฟังก์ชันเลือกไอคอนและสีตามชนิดไฟล์
+const getFileIconProps = (mimeType) => {
+    if (!mimeType) return { icon: <IconFileGeneric />, color: '#6b7280', label: 'FILE' };
+
+    // Excel (สีเขียว)
+    if (mimeType.includes('sheet') || mimeType.includes('excel') || mimeType.includes('spreadsheet')) {
+        return { icon: <IconExcel />, color: '#107c41', label: 'XLS' }; 
+    }
+    // Word (สีฟ้า)
+    if (mimeType.includes('word') || mimeType.includes('officedocument')) {
+        return { icon: <IconWord />, color: '#2b579a', label: 'DOC' };
+    }
+    // PDF (สีแดง)
+    if (mimeType.includes('pdf')) {
+        return { icon: <IconPDF />, color: '#e11d48', label: 'PDF' };
+    }
+    // Text/Other (สีเทา)
+    return { icon: <IconFileGeneric />, color: '#6b7280', label: mimeType.split('/')[1]?.toUpperCase().substring(0,4) || 'FILE' };
+};
 
 // แปลงข้อความธรรมดาที่มี * และ **
 const renderInlineMarkdown = (text) => {
@@ -219,14 +272,6 @@ const Bot = () => {
         }
     };
 
-    const getFileExt = (mimeType) => {
-        if (!mimeType) return 'FILE';
-        if (mimeType.includes('pdf')) return 'PDF';
-        if (mimeType.includes('word') || mimeType.includes('officedocument')) return 'DOC';
-        if (mimeType.includes('sheet') || mimeType.includes('excel')) return 'XLS';
-        return mimeType.split('/')[1]?.toUpperCase().substring(0,4) || 'FILE';
-    };
-
     return (
         <div className="chat-shell">
             {isSidebarOpen && (
@@ -261,7 +306,6 @@ const Bot = () => {
                     {messages.map((msg, index) => (
                         <div key={index} className={`message-row ${msg.type}-row`}>
                             {msg.type === 'bot' && (
-                                /* --- แก้ไขตรงนี้: ใช้ตัวแปร botLogo แทนลิงก์ --- */
                                 <img src={botLogo} alt="LIONBOT" className="avatar" />
                             )}
                             
@@ -271,30 +315,36 @@ const Bot = () => {
                                 </div>
 
                                 {Array.isArray(msg.files) &&
-                                    msg.files.map((f, i) =>
-                                        f.isImage ? (
-                                            <img
-                                                key={`img-${i}`}
-                                                src={f.previewUrl || f.base64}
-                                                alt="attached"
-                                                className="chat-uploaded-image"
-                                            />
-                                        ) : (
-                                            <div className="file-attachment" key={`file-${i}`}>
-                                                <div className="file-attachment-icon">
-                                                    <IconFileGeneric />
+                                    msg.files.map((f, i) => {
+                                        if (f.isImage) {
+                                            return (
+                                                <img
+                                                    key={`img-${i}`}
+                                                    src={f.previewUrl || f.base64}
+                                                    alt="attached"
+                                                    className="chat-uploaded-image"
+                                                />
+                                            );
+                                        } else {
+                                            // เรียกใช้ฟังก์ชันเลือกไอคอนและสี
+                                            const { icon, color, label } = getFileIconProps(f.type);
+                                            return (
+                                                <div className="file-attachment" key={`file-${i}`}>
+                                                    <div className="file-attachment-icon" style={{ backgroundColor: color }}>
+                                                        {icon}
+                                                    </div>
+                                                    <div className="file-attachment-info">
+                                                        <span className="file-attachment-name">
+                                                            {f.name}
+                                                        </span>
+                                                        <span className="file-attachment-meta">
+                                                            {label} Document
+                                                        </span>
+                                                    </div>
                                                 </div>
-                                                <div className="file-attachment-info">
-                                                    <span className="file-attachment-name">
-                                                        {f.name}
-                                                    </span>
-                                                    <span className="file-attachment-meta">
-                                                        {getFileExt(f.type)} Document
-                                                    </span>
-                                                </div>
-                                            </div>
-                                        )
-                                    )}
+                                            );
+                                        }
+                                    })}
                             </div>
                         </div>
                     ))}
@@ -302,7 +352,6 @@ const Bot = () => {
                     {/* Animation กำลังพิมพ์... */}
                     {isLoading && (
                         <div className="message-row bot-row">
-                             {/* --- แก้ไขตรงนี้: ใช้ตัวแปร botLogo แทนลิงก์ --- */ }
                              <img src={botLogo} alt="LIONBOT" className="avatar" />
                              <div className="typing-indicator">
                                  <div className="typing-dot"></div>
@@ -318,39 +367,42 @@ const Bot = () => {
                     {selectedFiles.length > 0 && (
                         <div className="preview-popup">
                             <div className="preview-content">
-                                {selectedFiles.map((f, index) => (
-                                    <div className="preview-item" key={`pv-${index}`}>
-                                        {f.isImage ? (
-                                            <img
-                                                src={f.previewUrl}
-                                                alt="Preview"
-                                                className="preview-thumbnail"
-                                            />
-                                        ) : (
-                                            <div className="preview-file-icon">
-                                                <div className="preview-file-icon-inner">
-                                                    <IconFileGeneric />
+                                {selectedFiles.map((f, index) => {
+                                    const { icon, color, label } = getFileIconProps(f.type);
+                                    return (
+                                        <div className="preview-item" key={`pv-${index}`}>
+                                            {f.isImage ? (
+                                                <img
+                                                    src={f.previewUrl}
+                                                    alt="Preview"
+                                                    className="preview-thumbnail"
+                                                />
+                                            ) : (
+                                                <div className="preview-file-icon">
+                                                    <div className="preview-file-icon-inner" style={{ backgroundColor: color }}>
+                                                        {icon}
+                                                    </div>
+                                                    <span className="preview-file-ext">
+                                                        {label}
+                                                    </span>
                                                 </div>
-                                                <span className="preview-file-ext">
-                                                    {getFileExt(f.type)}
+                                            )}
+                                            <div className="preview-info">
+                                                <span className="file-name">{f.name}</span>
+                                                <span className="file-type">
+                                                    {f.isImage ? 'Image' : 'Document'}
                                                 </span>
                                             </div>
-                                        )}
-                                        <div className="preview-info">
-                                            <span className="file-name">{f.name}</span>
-                                            <span className="file-type">
-                                                {f.isImage ? 'Image' : 'Document'}
-                                            </span>
+                                            <button
+                                                type="button"
+                                                className="preview-remove-btn"
+                                                onClick={() => removeFileAt(index)}
+                                            >
+                                                ×
+                                            </button>
                                         </div>
-                                        <button
-                                            type="button"
-                                            className="preview-remove-btn"
-                                            onClick={() => removeFileAt(index)}
-                                        >
-                                            ×
-                                        </button>
-                                    </div>
-                                ))}
+                                    );
+                                })}
                             </div>
                             <button
                                 type="button"
